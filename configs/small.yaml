@@ -2,9 +2,9 @@
 # vocab_size будет подставлен из BPE автоматически
 
 model:
-  d_model: 384        # размерность embeddings (256/384/512)
-  n_heads: 6          # число голов внимания (должно делить d_model)
-  n_layers: 6         # число блоков трансформера
+  d_model: 256        # размерность embeddings (256/384/512)
+  n_heads: 4          # число голов внимания (должно делить d_model)
+  n_layers: 4         # число блоков трансформера
   max_seq_len: 512    # контекстное окно (для токенов)
   dropout: 0.1        # регуляризация
 
@@ -15,16 +15,16 @@ rope:
   enabled: false      # RoPE для современности (Llama-style) — пока выключено
   base: 10000
 
-# Подсчёт параметров (vocab_size=8000):
-# embeddings: 8000 * 384 = 3.07M
-# position:    512 * 384 = 0.20M
+# Подсчёт параметров (vocab_size=1500):
+# embeddings: 1500 * 256 = 0.38M
+# position:    512 * 256 = 0.13M
 # per block: 4*d_model² + 2*d_model*hidden
-#            = 4*147456 + 2*384*1536 = 0.590M + 1.180M = 1.770M
-# 6 blocks:                     10.62M
+#            = 4*65536 + 2*256*1024 = 0.262M + 0.524M = 0.786M
+# 4 blocks:                      3.15M
 # final LN:                          ~1K
-# output head:  8000 * 384 =    3.07M (shared with input embeddings)
+# output head:  1500 * 256 =    0.38M (shared with input embeddings)
 # ----
-# Total: ~17M (без shared head: ~20M)
+# Total: ~3.7M (без shared head: ~3.3M)
 #
-# Если выставить d_model=512, n_layers=8: ~50M параметров
-# Если d_model=256, n_layers=4:                 ~7M
+# Если выставить d_model=384, n_layers=6: ~10.8M параметров (как планировалось)
+# Если d_model=512, n_layers=8: ~25M параметров

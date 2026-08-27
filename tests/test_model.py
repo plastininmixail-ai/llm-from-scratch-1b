@@ -131,17 +131,25 @@ class TestModelSize:
     """Проверяем, что размер модели соответствует ожиданиям."""
 
     def test_small_model_size(self):
-        cfg = ModelConfig(
-            vocab_size=8000, d_model=384, n_heads=6, n_layers=6,
-            max_seq_len=512, dropout=0.0
+        # Размер берётся из configs/small.yaml (после обновления)
+        # и валидируется против реального числа параметров.
+        from model import load_config
+        cfg = load_config("configs/small.yaml", vocab_size=1500)
+        # ожидаемое значение: ~3.3M для d_model=256, n_layers=4
+        # допуск: ±20% от теоретической формулы (с учётом bias=False в GPT-2)
+        # формула: tok_emb + pos_emb + n_layers*(4*d² + 2*d*hidden) + 2*d
+        expected = (
+            cfg.vocab_size * cfg.d_model
+            + cfg.max_seq_len * cfg.d_model
+            + cfg.n_layers * (
+                4 * cfg.d_model ** 2
+                + 2 * cfg.d_model * cfg.d_model * cfg.mlp_hidden_mult
+            )
+            + 2 * cfg.d_model  # ln_f
         )
-        model = GPT(cfg)
-        # реальный расчёт:
-        #   embeddings: 8000 * 384 = 3.07M
-        #   position:    512 * 384 = 0.20M
-        #   6 blocks: 6 * (4*384² + 2*384*1536) = 6 * 1.77M = 10.62M
-        #   ln_f: ~1K
-        #   итого ~13.9M (без tied head) → после tie: ~10.8M
-        n = model.num_parameters(exclude_tied=True)
-        # допуск ±15%
-        assert 9e6 < n < 13e6, f"ожидалось ~10.8M, получили {n / 1e6:.2f}M"
+        n = GPT(cfg).num_parameters(exclude_tied=True)
+        # даём допуск ±15% из-за bias/batch-stats, не учтённых в формуле
+        assert abs(n - expected) / expected < 0.15, (
+            f"ожидалось ~{expected/1e6:.2f}M, получили {n/1e6:.2f}M "
+            f"(разница {abs(n-expected)/expected*100:.1f}%)"
+        )
