@@ -42,6 +42,9 @@ def main() -> int:
     p.add_argument("--eval-interval", type=int, default=200)
     p.add_argument("--save-interval", type=int, default=500)
     p.add_argument("--device", type=str, default="cpu")
+    p.add_argument("--resume-from", type=Path, default=None,
+                   help="warm-start: загрузить веса из этого .pt "
+                        "(model + optimizer state), продолжить обучение")
     args = p.parse_args()
 
     # токенизатор
@@ -52,6 +55,14 @@ def main() -> int:
     cfg = load_config(args.config, vocab_size=len(tok))
     model = GPT(cfg)
     print(f"model: {model.info()}")
+
+    # warm-start из чекпойнта (если указан)
+    if args.resume_from is not None:
+        ckpt = torch.load(args.resume_from, map_location=args.device,
+                          weights_only=False)
+        model.load_state_dict(ckpt["model"])
+        print(f"[warm-start] загружены веса из {args.resume_from} "
+              f"(step={ckpt.get('step','?')})")
 
     # датасет
     ds = TextDataset(args.corpus, tok, seq_len=args.seq_len, stride=args.seq_len)
@@ -77,7 +88,8 @@ def main() -> int:
         device=args.device,
     )
 
-    trainer = Trainer(model, train_ds, val_ds, tcfg)
+    trainer = Trainer(model, train_ds, val_ds, tcfg,
+                      resume_from=args.resume_from)
     t0 = time.time()
     trainer.train()
     print(f"total time: {(time.time()-t0)/60:.1f} min")

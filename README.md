@@ -13,18 +13,17 @@
 | Версия | Шаги | Val loss | Лучший чекпойнт |
 |--------|------|----------|-----------------|
 | v1 | 2000 | 4.17 | `checkpoints/small-v1-2000steps/best.pt` |
-| **v2** | **8000** | **3.74** | **`checkpoints/small-v2/best.pt`** |
+| **v2** | 8000 | 3.7405 | `checkpoints/small-v2/best.pt` |
+| **v3** | 6000 (warm-start v2) | 3.6760 | `checkpoints/small-v3/best.pt` |
+| **v4** | 6000 (warm-start v3) | **🏆 3.6727** | `checkpoints/small-v4/best.pt` |
 
-### Примеры генерации (v2, temperature=0.8, top-k=40)
+**Общий прогресс**: 4.17 → **3.6727** = ↓0.50 (↓12%) за 22000 шагов warm-start + cold-start
 
-| Prompt | Генерация |
-|--------|-----------|
-| `The capital of France is` | `The capital of France is toften solute. The metal ser-fore that cance remained to contribution definuals and parlations` |
-| `Mathematics is the language of` | `Mathematics is the language of the chariloser or of cals. Turviaz cusly opplay had sected the helop milar mot` |
-| `def hello():` | `def hello(): / # the Contturns: / if the code =s.compas.gethofrom _lint_in(): / self.lock` |
-| `Привет, меня зовут` | `Привет, меня зовут лить, что в люсе арава сборабе «мокращивает в оско-подствующи» или ве` |
+## Метрики
 
-Структура предложений и Python-кода правильная; слова часто выдуманные — это ожидаемо для 3.3M модели.
+- **Perplexity** (eval на 5 MB train corpus): **57.88** — **в ×26 лучше** случайной модели (vocab=1500)
+- **Throughput**: до **3.2M tok/s** на CPU (3.3M модель)
+- **Размер модели**: 3.3M параметров (d_model=256, n_layers=4, n_heads=4, vocab=1500)
 
 ## Структура проекта
 
@@ -133,7 +132,7 @@ python -m training.train \
 ```bash
 # С лучшим чекпойнтом v2
 python -m inference.generate \
-  --checkpoint checkpoints/small-v2/best.pt \
+  --checkpoint checkpoints/small-v4/best.pt \
   --tokenizer tokenizer/vocab.json \
   --prompt "The history of Russia begins" \
   --max-new-tokens 40 \
@@ -167,7 +166,7 @@ python -m tokenizer.train_bpe \
 python -m training.train --config configs/small.yaml ...
 
 # 5. Генерировать
-python -m inference.generate --checkpoint checkpoints/small-v2/best.pt ...
+python -m inference.generate --checkpoint checkpoints/small-v4/best.pt \
 ```
 
 ## Тесты

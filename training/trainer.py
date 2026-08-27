@@ -70,7 +70,8 @@ def get_lr(step: int, cfg: TrainerConfig) -> float:
 
 
 class Trainer:
-    def __init__(self, model: GPT, train_ds, val_ds, cfg: TrainerConfig):
+    def __init__(self, model: GPT, train_ds, val_ds, cfg: TrainerConfig,
+                 resume_from: str | Path | None = None):
         self.model = model.to(cfg.device)
         self.train_ds = train_ds
         self.val_ds = val_ds
@@ -90,6 +91,22 @@ class Trainer:
         self.log_path.write_text("")
         # метрики
         self.best_val = float("inf")
+
+        # warm-start: загрузить model+optimizer+step из чекпойнта
+        if resume_from is not None:
+            ckpt = torch.load(resume_from, map_location=cfg.device,
+                              weights_only=False)
+            self.model.load_state_dict(ckpt["model"])
+            if "optimizer" in ckpt:
+                try:
+                    self.optimizer.load_state_dict(ckpt["optimizer"])
+                except Exception as e:
+                    print(f"[warn] не удалось загрузить optimizer: {e}")
+            self.step = ckpt.get("step", 0)
+            # восстановить best_val если есть (для логики "best")
+            self.best_val = ckpt.get("best_val", float("inf"))
+            print(f"[warm-start] загружен чекпойнт {resume_from}, "
+                  f"step={self.step}, best_val={self.best_val:.4f}")
 
     def _make_loader(self, ds, shuffle: bool) -> DataLoader:
         return DataLoader(
