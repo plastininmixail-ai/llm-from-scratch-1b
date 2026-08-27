@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Данные и модели (большие, не в Git)
+data/raw/
+data/tokens/
+checkpoints/
+logs/
+*.pt
+*.pth
+*.bin
+
+# Среда
+.env
+.env.local
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Временные файлы
+*.tmp
+*.log
+!logs/.gitkeep
