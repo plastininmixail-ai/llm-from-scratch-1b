@@ -27,6 +27,8 @@ def main() -> int:
     p.add_argument("--min-pair-freq", type=int, default=2)
     p.add_argument("--limit-bytes", type=int, default=0,
                    help="ограничить корпус (0 = без лимита)")
+    p.add_argument("--checkpoint", action="store_true",
+                   help="сохранять checkpoint каждые 500 merges")
     args = p.parse_args()
 
     if not args.input.exists():
@@ -64,7 +66,8 @@ def main() -> int:
     tok.fit(text_iter(),
             vocab_size=args.vocab_size,
             min_pair_freq=args.min_pair_freq,
-            verbose=True)
+            verbose=True,
+            checkpoint_path=str(args.output) if args.checkpoint else None)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     tok.save(args.output)

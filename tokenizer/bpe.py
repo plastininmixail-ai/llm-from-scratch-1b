@@ -22,10 +22,14 @@ BPE-токенизатор с нуля на чистом Python (без стор
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import time
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
+from multiprocessing import cpu_count
 from pathlib import Path
 from typing import Iterable
 
@@ -46,6 +50,40 @@ PAT = re.compile(
 END_OF_WORD = "</w>"
 
 
+# ---------------------------------------------------------------------------- #
+# Параллельный подсчёт пар (узкое место обучения)
+# ---------------------------------------------------------------------------- #
+def _count_pairs_chunk(words_and_freqs: list[tuple[tuple[bytes, ...], int]]) -> Counter:
+    """Считает частоты пар в подмножестве слов. Чистый Python, выполняется в воркере."""
+    pair_freqs: Counter = Counter()
+    for word, freq in words_and_freqs:
+        if len(word) < 2:
+            continue
+        for i in range(len(word) - 1):
+            pair_freqs[(word[i], word[i + 1])] += freq
+    return pair_freqs
+
+
+def _apply_merge_chunk(
+    words_and_freqs: list[tuple[tuple[bytes, ...], int]],
+    best_a: bytes, best_b: bytes, new_token: bytes
+) -> list[tuple[tuple[bytes, ...], int]]:
+    """Применяет merge ко всем словам в чанке. Тоже чистый Python."""
+    out = []
+    for word, freq in words_and_freqs:
+        new_word = []
+        i = 0
+        while i < len(word):
+            if i < len(word) - 1 and word[i] == best_a and word[i + 1] == best_b:
+                new_word.append(new_token)
+                i += 2
+            else:
+                new_word.append(word[i])
+                i += 1
+        out.append((tuple(new_word), freq))
+    return out
+
+
 class BPETokenizer:
     def __init__(self):
         self.vocab: dict[int, bytes] = {}        # id → bytes
@@ -64,7 +102,8 @@ class BPETokenizer:
         self.token_to_id = {v: k for k, v in self.vocab.items()}
 
     def fit(self, text_iter: Iterable[str], vocab_size: int = 8000,
-            min_pair_freq: int = 2, verbose: bool = True) -> "BPETokenizer":
+            min_pair_freq: int = 2, verbose: bool = True,
+            checkpoint_path: str | None = None) -> "BPETokenizer":
         assert vocab_size >= 257, "vocab_size должен быть ≥ 257 (256 байт + </w>)"
 
         if verbose:
@@ -92,13 +131,33 @@ class BPETokenizer:
         # итеративно сливаем самые частые пары
         _t_start = time.time()
         iteration = 0
+        # ProcessPoolExecutor на Windows + ProcessPool-сериализация bytes-tuple
+        # иногда зависает (воспроизводится на 50+ merges); надёжнее работать
+        # последовательно. CPU = 6 ядер, итерация ~0.5 c → ~15 мин на vocab=2000
+        n_workers = 1
+        use_parallel = False
+        # конвертим word_freqs в список для разбиения на чанки
+        word_list = list(word_freqs.items())
+        chunk_size = max(1000, len(word_list) // (n_workers * 4))
+        if verbose:
+            print(f"[bpe] {n_workers} workers, parallel={use_parallel}, "
+                  f"chunks of {chunk_size}")
+
         while len(self.vocab) < vocab_size:
-            pair_freqs: Counter[tuple[bytes, bytes]] = Counter()
-            for word, freq in word_freqs.items():
-                if len(word) < 2:
-                    continue
-                for a, b in zip(word[:-1], word[1:]):
-                    pair_freqs[(a, b)] += freq
+            # считаем частоты пар (параллельно или последовательно)
+            if use_parallel:
+                chunks = [word_list[i:i + chunk_size]
+                          for i in range(0, len(word_list), chunk_size)]
+                with ProcessPoolExecutor(max_workers=n_workers) as pool:
+                    counters = pool.map(_count_pairs_chunk, chunks)
+                pair_freqs = sum(counters, Counter())
+            else:
+                pair_freqs = Counter()
+                for word, freq in word_list:
+                    if len(word) < 2:
+                        continue
+                    for i in range(len(word) - 1):
+                        pair_freqs[(word[i], word[i + 1])] += freq
 
             if not pair_freqs:
                 if verbose:
@@ -118,35 +177,55 @@ class BPETokenizer:
             self.merges.append(best_pair)
             self.merge_ranks[best_pair] = len(self.merges) - 1
 
-            # пересчитываем корпус с новым токеном
-            new_word_freqs: Counter[tuple[bytes, ...]] = Counter()
-            for word, freq in word_freqs.items():
-                new_word = []
-                i = 0
-                while i < len(word):
-                    if (i < len(word) - 1
-                            and word[i] == best_pair[0]
-                            and word[i+1] == best_pair[1]):
-                        new_word.append(new_token)
-                        i += 2
-                    else:
-                        new_word.append(word[i])
-                        i += 1
-                new_word_freqs[tuple(new_word)] += freq
-            word_freqs = new_word_freqs
+            # применяем merge ко всем словам (параллельно)
+            if use_parallel:
+                chunks = [word_list[i:i + chunk_size]
+                          for i in range(0, len(word_list), chunk_size)]
+                func = partial(_apply_merge_chunk,
+                               best_a=best_pair[0],
+                               best_b=best_pair[1],
+                               new_token=new_token)
+                with ProcessPoolExecutor(max_workers=n_workers) as pool:
+                    new_chunks = pool.map(func, chunks)
+                word_list = [item for chunk in new_chunks for item in chunk]
+            else:
+                new_list = []
+                for word, freq in word_list:
+                    new_word = []
+                    i = 0
+                    while i < len(word):
+                        if (i < len(word) - 1
+                                and word[i] == best_pair[0]
+                                and word[i+1] == best_pair[1]):
+                            new_word.append(new_token)
+                            i += 2
+                        else:
+                            new_word.append(word[i])
+                            i += 1
+                    new_list.append((tuple(new_word), freq))
+                word_list = new_list
 
             iteration += 1
             if verbose and (iteration % 50 == 0 or iteration < 50):
                 print(f"[bpe] vocab {len(self.vocab)}/{vocab_size} "
                       f"({iteration} merges done) "
                       f"last: {best_pair!r} → {len(new_token)} bytes "
-                      f"(freq={best_freq}, time={time.time()-_t_start:.0f}s)",
+                      f"(freq={best_freq}, time={time.time()-_t_start:.0f}s, "
+                      f"workers={n_workers if use_parallel else 1})",
                       flush=True)
-            if iteration == 1:
-                _t_start = time.time()
+
+            # checkpoint каждые 100 merges (на случай зависания)
+            if checkpoint_path and iteration % 100 == 0:
+                # сохраняем копию текущего состояния
+                ckpt_path = Path(str(checkpoint_path).replace(".json",
+                                                              f".iter{iteration}.json"))
+                self.save(ckpt_path)
+                if verbose:
+                    print(f"[bpe] checkpoint: {ckpt_path}", flush=True)
 
         if verbose:
-            print(f"[bpe] done: vocab={len(self.vocab)}, merges={len(self.merges)}")
+            print(f"[bpe] done: vocab={len(self.vocab)}, merges={len(self.merges)}, "
+                  f"elapsed={time.time()-_t_start:.0f}s")
 
         self.cache = {}
         return self
