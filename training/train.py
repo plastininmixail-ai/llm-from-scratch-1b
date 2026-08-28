@@ -45,6 +45,15 @@ def main() -> int:
     p.add_argument("--resume-from", type=Path, default=None,
                    help="warm-start: загрузить веса из этого .pt "
                         "(model + optimizer state), продолжить обучение")
+    p.add_argument("--reset-step", action="store_true",
+                   help="при warm-start начать с step=0 (но сохранить веса и optimizer)")
+    p.add_argument("--resume-optimizer", action="store_true",
+                   help="при warm-start загружать состояние optimizer "
+                        "(по умолчанию — False: optimizer инициализируется заново)")
+    p.add_argument("--min-lr-ratio", type=float, default=None,
+                   help="минимальный lr как доля от lr (default: 0.1)")
+    p.add_argument("--seed", type=int, default=None,
+                   help="random seed (default: 42)")
     args = p.parse_args()
 
     # токенизатор
@@ -87,9 +96,17 @@ def main() -> int:
         out_dir=str(args.out_dir),
         device=args.device,
     )
+    # применяем CLI overrides
+    if args.min_lr_ratio is not None:
+        tcfg.min_lr_ratio = args.min_lr_ratio
+    if args.seed is not None:
+        tcfg.seed = args.seed
+        torch.manual_seed(args.seed)
 
     trainer = Trainer(model, train_ds, val_ds, tcfg,
-                      resume_from=args.resume_from)
+                      resume_from=args.resume_from,
+                      reset_step=args.reset_step,
+                      resume_optimizer=args.resume_optimizer)
     t0 = time.time()
     trainer.train()
     print(f"total time: {(time.time()-t0)/60:.1f} min")

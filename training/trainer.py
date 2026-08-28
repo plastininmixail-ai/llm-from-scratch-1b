@@ -14,12 +14,22 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Iterator
 
 import torch
+
+# CPU-оптимизации: ограничиваем потоки (8 cores на этом CPU)
+try:
+    n_threads = int(os.environ.get("TORCH_NUM_THREADS", "4"))
+    torch.set_num_threads(n_threads)
+    torch.set_num_interop_threads(1)
+    print(f"[cpu] torch.set_num_threads={n_threads}")
+except Exception:
+    pass
 from torch.utils.data import DataLoader
 
 from model import GPT
@@ -48,7 +58,7 @@ class TrainerConfig:
     eval_iters: int = 20
 
     # Saving
-    save_interval: int = 500
+    save_interval: int = 1000
     out_dir: str = "checkpoints"
 
     # Device
@@ -71,7 +81,9 @@ def get_lr(step: int, cfg: TrainerConfig) -> float:
 
 class Trainer:
     def __init__(self, model: GPT, train_ds, val_ds, cfg: TrainerConfig,
-                 resume_from: str | Path | None = None):
+                 resume_from: str | Path | None = None,
+                 reset_step: bool = False,
+                 resume_optimizer: bool = False):
         self.model = model.to(cfg.device)
         self.train_ds = train_ds
         self.val_ds = val_ds
@@ -96,13 +108,60 @@ class Trainer:
         if resume_from is not None:
             ckpt = torch.load(resume_from, map_location=cfg.device,
                               weights_only=False)
+
+            # === verify_checkpoint: проверка целостности ===
+            required = ["model"]
+            missing = [k for k in required if k not in ckpt]
+            if missing:
+                raise RuntimeError(
+                    f"[verify_checkpoint] FAIL: missing keys: {missing}")
+            # проверка embedding shape (vocab × d_model)
+            for k in ("tok_emb.weight", "tok_embeddings.weight"):
+                if k in ckpt["model"]:
+                    emb_shape = tuple(ckpt["model"][k].shape)
+                    cfg_vocab = self.model.config.vocab_size
+                    cfg_dim = self.model.config.d_model
+                    if emb_shape != (cfg_vocab, cfg_dim):
+                        raise RuntimeError(
+                            f"[verify_checkpoint] FAIL: embedding shape "
+                            f"{emb_shape} != ({cfg_vocab}, {cfg_dim})")
+                    break
+            print(f"[verify_checkpoint] ✓ {resume_from} "
+                  f"(step={ckpt.get('step', '?')}, "
+                  f"best_val={ckpt.get('best_val', float('nan')):.4f})")
+
+            # === validate_architecture: сравнение с текущей конфигурацией ===
+            arch = ckpt.get("model_config", {})
+            checks = {
+                "d_model": arch.get("d_model"),
+                "n_heads": arch.get("n_heads"),
+                "n_layers": arch.get("n_layers"),
+                "vocab_size": arch.get("vocab_size"),
+                "max_seq_len": arch.get("max_seq_len"),
+            }
+            mismatches = []
+            cur = self.model.config
+            for k, saved in checks.items():
+                cur_v = getattr(cur, k, None)
+                if saved is not None and saved != cur_v:
+                    mismatches.append(f"{k}: ckpt={saved} != current={cur_v}")
+            if mismatches:
+                raise RuntimeError(
+                    f"[validate_architecture] FAIL: {mismatches}")
+            print(f"[validate_architecture] ✓ config matches")
+
             self.model.load_state_dict(ckpt["model"])
-            if "optimizer" in ckpt:
+            self.step = ckpt.get("step", 0)
+            if reset_step:
+                old_step = self.step
+                self.step = 0
+                print(f"[warm-start] reset-step: {old_step} → 0 (веса сохранены)")
+            if resume_optimizer and "optimizer" in ckpt:
                 try:
                     self.optimizer.load_state_dict(ckpt["optimizer"])
+                    print("[warm-start] optimizer state загружен")
                 except Exception as e:
                     print(f"[warn] не удалось загрузить optimizer: {e}")
-            self.step = ckpt.get("step", 0)
             # восстановить best_val если есть (для логики "best")
             self.best_val = ckpt.get("best_val", float("inf"))
             print(f"[warm-start] загружен чекпойнт {resume_from}, "
@@ -136,7 +195,6 @@ class Trainer:
         path = self.out_dir / f"{tag}.pt"
         torch.save({
             "model": self.model.state_dict(),
-            "optimizer": self.optimizer.state_dict(),
             "step": self.step,
             "model_config": asdict(self.model.config),
             "trainer_config": asdict(self.cfg),
