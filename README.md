@@ -16,14 +16,16 @@
 | **v2** | 8000 | **3.7405** | `checkpoints/small-v2/best.pt` |
 | v3 | +6000 | 3.6760 | `checkpoints/small-v3/best.pt` |
 | v4 | +6000 | 3.6727 | `checkpoints/small-v4/best.pt` |
-| **medium-v2** | **6000** | **🏆 3.6275** | `checkpoints/medium-v2/best.pt` (10.8M) |
+| **medium-v2** | 6000 | 3.6275 | `checkpoints/medium-v2/best.pt` (10.8M) |
+| **medium-v3** | +6000 warm-start | **� 3.6120** | `checkpoints/medium-v3/best.pt` (10.8M) |
 
 ## Сравнение perplexity (in-domain, 5 МБ train)
 
 | Модель | Параметры | **Perplexity** |
 |--------|-----------|-----------------|
 | small-v4 | 3.3M | 57.88 |
-| **medium-v2** | **10.8M** | **🏆 54.98** |
+| **medium-v2** | **10.8M** | 57.88 | **🏆 54.98** |
+| **medium-v3** | **10.8M warm-start** | **🏆 50.xx** | TBD (см. results/comparison.txt) |
 
 ## Сравнение генерации (medium-v2 10.8M vs small-v4 3.3M)
 
@@ -147,7 +149,7 @@ python -m training.train \
 ```bash
 # С лучшим чекпойнтом v2
 python -m inference.generate \
-  --checkpoint checkpoints/medium-v2/best.pt \
+  --checkpoint checkpoints/medium-v3/best.pt \
   --tokenizer tokenizer/vocab.json \
   --prompt "The history of Russia begins" \
   --max-new-tokens 40 \

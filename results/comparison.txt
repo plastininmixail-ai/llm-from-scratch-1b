@@ -1,0 +1,54 @@
+================================================================================
+СРАВНИТЕЛЬНАЯ ГЕНЕРАЦИЯ — 4 моделей
+================================================================================
+
+[EN] prompt: 'The capital of France is'
+--------------------------------------------------------------------------------
+[small-v2] The capital of France is the relations of bin. ref /ref Trossock covern cover sings the Prough was not trayal in the Cour
+[small-v3] The capital of France is the public tect of three of both four with the power sethaps in Askin, and was saull
+[small-v4] The capital of France is most solar would be a pople sled direction of pootes. He to the slow carvisliaze
+[medium-v2] The capital of France is the bodured a listance of the literal (derborn city of than secification called to life cap
+
+[EN] prompt: 'Mathematics is the'
+--------------------------------------------------------------------------------
+[small-v2] Mathematics is the stry--barly some languages and confiximilitutilds of a pold fincoms of the g
+[small-v3] Mathematics is the largest same durrench of Sa. The stude is do treately earach endined to different area
+[small-v4] Mathematics is the father and crequirection basures back brint between the first indeen suction from preed
+[medium-v2] Mathematics is the writte of the rights of the rualth of the Mission of the directorical between in the General Liker M
+
+[EN] prompt: 'def hello():'
+--------------------------------------------------------------------------------
+[small-v2] def hello():
+                self.assertEqualue_stas,
+        port sour# Fief fostat_s.const__rest
+[small-v3] def hello():
+        cept
+            "
+        s.def test_inte_war_log(her()
+[small-v4] def hello():
+                attttemplays.condept("comback()
+            def fi_ver_g
+[medium-v2] def hello():
+            """
+        mlt_msk_port.path_bb_comdef test_file__mode
+
+[EN] prompt: 'The history of Russia begins'
+--------------------------------------------------------------------------------
+[small-v2] The history of Russia begins that was tareed a sering of the Gorian cronic caun and star. ref name= Gostahe.41.4
+[small-v3] The history of Russia begins and the Louth of Euly of Plish, Roman sitary of Germaniely. The first Parland of Mork It
+[small-v4] The history of Russia begins were reventiated with the Reshapon's lims of Greface in Eary, As hallextons estaboring
+[medium-v2] The history of Russia begins when the Monneok. ref /ref Symer the Broland Schylie Must of Symenne (Am
+
+[RU] prompt: 'Привет, меня зовут'
+--------------------------------------------------------------------------------
+[small-v2] Привет, меня зовут сманными деприцы в законяти в то итурнигационом. Двили устровые распря
+[small-v3] Привет, меня зовут (пря) течние в создноге и менных и напримостью в должной действух, нак
+[small-v4] Привет, меня зовут по верх. Большой сушей декаеты на главной культатерватурно. Европ второй
+[medium-v2] Привет, меня зовут с органий собственного дрозвоца с когоны в минале паменьюта и их грл
+
+[RU] prompt: 'Вчера я пошёл в'
+--------------------------------------------------------------------------------
+[small-v2] Вчера я пошёл в обяжёнке с приняют на входяде (ниощей в мноции, привший вместе город
+[small-v3] Вчера я пошёл в во народных алме ref Б. Р. Ромоюзромин. С. Однциклопедия: М., М.: Б
+[small-v4] Вчера я пошёл в средне продил заменных княжирую. Примиру без постиг Кроколее во западач
+[medium-v2] Вчера я пошёл в должения и бритории и гранспаний и Ата и Крхан Болду в Констерни и Николон
