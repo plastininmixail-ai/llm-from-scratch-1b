@@ -1,0 +1,22 @@
+model:
+  d_model: 384        # размерность embeddings (384/512/768)
+  n_heads: 6          # число голов внимания (должно делить d_model)
+  n_layers: 6         # число блоков трансформера
+  max_seq_len: 512    # контекстное окно
+  dropout: 0.1        # для тренировки (для eval ставим 0.0)
+
+training:
+  batch_size: 16      # больше batch для 10M модели
+  seq_len: 256        # токенов в одном окне
+  lr: 3e-4            # learning rate
+  warmup: 500         # warmup шагов
+  weight_decay: 0.1   # AdamW weight decay
+  grad_clip: 1.0      # gradient clipping max norm
+
+tokenizer:
+  vocab_size: 6000    # 4x больше чем раньше (1500)
+  # путь к токенизатору передаётся через --tokenizer
+
+data:
+  corpus: data/raw/corpus.txt
+  # для 10M модели можно взять полный корпус 144 МБ

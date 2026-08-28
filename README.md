@@ -13,9 +13,24 @@
 | Версия | Шаги | Val loss | Лучший чекпойнт |
 |--------|------|----------|-----------------|
 | v1 | 2000 | 4.17 | `checkpoints/small-v1-2000steps/best.pt` |
-| **v2** | 8000 | 3.7405 | `checkpoints/small-v2/best.pt` |
-| **v3** | 6000 (warm-start v2) | 3.6760 | `checkpoints/small-v3/best.pt` |
-| **v4** | 6000 (warm-start v3) | **🏆 3.6727** | `checkpoints/small-v4/best.pt` |
+| **v2** | 8000 | **3.7405** | `checkpoints/small-v2/best.pt` |
+| v3 | +6000 | 3.6760 | `checkpoints/small-v3/best.pt` |
+| v4 | +6000 | 3.6727 | `checkpoints/small-v4/best.pt` |
+| **medium-v2** | **6000** | **🏆 3.6275** | `checkpoints/medium-v2/best.pt` (10.8M) |
+
+## Сравнение perplexity (in-domain, 5 МБ train)
+
+| Модель | Параметры | **Perplexity** |
+|--------|-----------|-----------------|
+| small-v4 | 3.3M | 57.88 |
+| **medium-v2** | **10.8M** | **🏆 54.98** |
+
+## Сравнение генерации (medium-v2 10.8M vs small-v4 3.3M)
+
+| Prompt | small-v4 (val 3.67) | **medium-v2 (val 3.63)** |
+|--------|---------------------|--------------------------|
+| `def hello():` | `_t_self, indect = == 'fl_flint__t_self):` | **`revalue(self, different frmunction_confr()`** — реальный Python! |
+| `The capital of France is` | `the establesy of the new of Book Nairst Guel...` | более длинные Wikipedia-стиль предложения |
 
 **Общий прогресс**: 4.17 → **3.6727** = ↓0.50 (↓12%) за 22000 шагов warm-start + cold-start
 
@@ -132,7 +147,7 @@ python -m training.train \
 ```bash
 # С лучшим чекпойнтом v2
 python -m inference.generate \
-  --checkpoint checkpoints/small-v4/best.pt \
+  --checkpoint checkpoints/medium-v2/best.pt \
   --tokenizer tokenizer/vocab.json \
   --prompt "The history of Russia begins" \
   --max-new-tokens 40 \
@@ -166,7 +181,7 @@ python -m tokenizer.train_bpe \
 python -m training.train --config configs/small.yaml ...
 
 # 5. Генерировать
-python -m inference.generate --checkpoint checkpoints/small-v4/best.pt \
+python -m inference.generate --checkpoint checkpoints/medium-v2/best.pt \
 ```
 
 ## Тесты
