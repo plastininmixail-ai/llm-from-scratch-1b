@@ -1,62 +1,121 @@
-# 🚀 Bridge Bot — Руководство
+# LLM from Scratch — 1B Model
 
-## Что это
-Telegram бот на собственной LLM модели.
+GPT-style decoder-only transformer trained from scratch with custom multi-agent framework.
 
-## Архитектура (v15)
+## 🎯 Goal
+
+Build a 1B-parameter reasoning-capable language model from scratch, with:
+- Custom BPE tokenizer
+- Custom training framework (no HuggingFace Trainer)
+- Multi-agent orchestration (Architect / Data Engineer / Trainer / Curator)
+- Stage 0: Pretrain on FineWeb-Edu
+- Stage 1: Instruction following (planned)
+
+## 🏗️ Architecture
+
+- **Parameters**: ~1.07B
+- **Layers**: 20
+- **d_model**: 2048
+- **Heads**: 32 (head_dim=64)
+- **Context**: 1024 tokens
+- **Vocab**: 32K BPE
+- **Norm**: RMSNorm
+- **Position**: RoPE
+- **Activation**: GELU
+
+## 📦 Repo Structure
 
 ```
-Пользователь → Telegram API
-    ↓
-Bridge Bot (inference/bridge_bot.py)
-    ├── Intent Classifier (intent_classifier.py, 389 примеров)
-    ├── Sentiment Analyzer (sentiment.py, 8 эмоций)
-    ├── Empathy prefix
-    ↓
-[1] Hardcoded (1461 паттернов) → 90%+ покрытие
-    ↓ (если не найдено)
-[2] TF-IDF KB (11,939 записей) → быстрый поиск
-    ↓
-[3] Web Agent v5 (если свежая инфа)
-[4] Code Agent v3 (если вычисления)
-    ↓
-[5] v103 model (113M, RMSNorm + RoPE)
-    ↓
-Ответ пользователю
+llm-from-scratch/
+├── agents/              # Multi-agent orchestration
+│   ├── architect/       # Model design
+│   ├── data_engineer/   # Corpus preparation
+│   ├── trainer/         # Training loop
+│   ├── curator/         # Checkpoint management
+│   ├── orchestrator/    # Pipeline coordination
+│   └── common/          # Base classes & protocol
+├── framework/           # Custom ML framework
+│   ├── model/           # GPT + RMSNorm + RoPE
+│   ├── data/            # BinaryDataset + tokenization
+│   ├── training/        # Trainer with AdamW + cosine
+│   ├── inference/       # Text generation
+│   └── evaluation/      # Perplexity metrics
+├── configs/             # Training configs (YAML)
+├── scripts/             # 30+ training/eval/upload scripts
+├── data/                # Corpus (gitignored, 30GB+)
+├── checkpoints/         # Model weights (gitignored)
+└── logs/                # Training logs (gitignored)
 ```
 
-## Как запустить
+## 🚀 Quick Start
+
+### Install
 
 ```bash
-# Установить зависимости
-.venv/Scripts/python.exe -m pip install -r requirements.txt
-
-# Запустить Bridge Bot
-.venv/Scripts/python.exe -m inference.bridge_bot \
-  --checkpoint checkpoints/chat-xlarge-v103-15k/best.pt \
-  --tokenizer tokenizer/vocab_3k.json
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install torch pyyaml requests python-dotenv pynacl huggingface_hub
 ```
 
-## Чекпойнты
+### Train
 
-| Run | val | Когда использовать |
-|-----|-----|-------------------|
-| **v103** | **4.49** | Лучший (рекомендую) |
-| v94 | 3.62 | Запасной (Bridge Bot v14) |
+```bash
+# Pretrain from scratch (1B model)
+python -m scripts.train_v1 \
+  --config configs/v1_fineweb.yaml \
+  --warm-start checkpoints/v0_1b_1000/best.pt
 
-## Файлы
+# Or run pipeline end-to-end
+python -m scripts.test_pipeline
+```
 
-- `PLAN.md` — план работы
-- `docs/WEEK1_SUMMARY.md` — итоги недели
-- `HARD_BANS.md` — запреты (стоицизм, force-kill)
-- `inference/bridge_bot.py` — главный файл бота
-- `model/transformer.py` — GPT с RMSNorm + RoPE
-- `model/rmsnorm.py` — RMSNorm
-- `model/rope.py` — RoPE
+### Generate
 
-## Известные проблемы
+```bash
+python -m scripts.sample \
+  --checkpoint checkpoints/v1_fineweb/best.pt \
+  --prompt "The capital of France is" \
+  --max-tokens 50 \
+  --n-samples 3
+```
 
-1. **113M мало** для связного русского текста
-2. **vocab 3000** — нужен 16-32K
-3. **CPU обучение** медленное
-4. **Модели мусорят** на свободные темы (но hardcoded + KB покрывает 90%)
+## 🤖 Multi-Agent System
+
+```
+Orchestrator
+   │
+   ├─→ Architect (model design)
+   ├─→ Data Engineer (corpus)
+   ├─→ Trainer (training loop)
+   └─→ Curator (artifacts)
+```
+
+Each agent is a Python class in `agents/<name>/agent.py` with:
+- `execute(task) -> AgentResult`
+- Message passing via `logs/mailbox.jsonl`
+- Logging to `logs/<role>/agent.log`
+
+## 📊 Training Status
+
+| Stage | Model | Steps | Loss |
+|-------|-------|-------|------|
+| Stage 0 (v0) | 113M | 400 | 4.08 |
+| Stage 0.5 (v1) | 1B | running | 4.70 (step 80) |
+| Stage 1 | 1B + SFT | planned | — |
+
+## 🛠️ Tech Stack
+
+- **PyTorch 2.x** (CPU-only training)
+- **Python 3.12**
+- **Custom BPE** tokenizer (byte-level)
+- **No HuggingFace** — everything custom
+- **CPU-only** — 8 threads, ~3.5 min/step on 1B model
+
+## 📜 License
+
+Apache 2.0
+
+## 🤝 Links
+
+- **GitHub**: https://github.com/plastininmixail-ai/llm-from-scratch-1b
+- **HuggingFace**: https://huggingface.co/mixailplastinin/llm-from-scratch-1b
+- **Telegram bot**: @Gopcaninebot

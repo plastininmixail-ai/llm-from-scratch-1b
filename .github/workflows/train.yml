@@ -51,6 +51,15 @@ jobs:
             --warm-start checkpoints/v0_1b_1000/best.pt \
             --max-steps 1000
 
+      - name: Upload checkpoint to HF Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python -m scripts.upload_to_hf \
+            --checkpoint checkpoints/v1_fineweb/best.pt \
+            --repo mixailplastinin/llm-from-scratch-1b \
+            --card
+
       - name: Upload checkpoint
         uses: actions/upload-artifact@v4
         with:
