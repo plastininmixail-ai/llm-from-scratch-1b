@@ -1,0 +1,8 @@
+# Большая модель для chat-серии
+d_model: 576
+n_heads: 9
+n_layers: 8
+vocab_size: 1500
+max_seq_len: 256
+dropout: 0.0
+bias: false

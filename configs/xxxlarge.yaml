@@ -1,0 +1,40 @@
+# 500M model config — Bridge Bot 500M
+# Создано: 2026-09-05
+# Оценка параметров: 500M
+
+model:
+  d_model: 1280
+  n_heads: 20
+  n_layers: 32
+  max_seq_len: 256
+  vocab_size: 1500
+  mlp_hidden_mult: 4
+  tie_weights: true
+
+training:
+  batch_size: 1
+  seq_len: 256
+  lr: 2e-4
+  warmup: 500
+  weight_decay: 0.01
+  grad_clip: 1.0
+
+# Phase 1: Pre-training
+pretrain:
+  data: data/raw/chat_xlarge_corpus.txt
+  max_steps: 5000
+  estimated_time: 4-6 hours
+
+# Phase 2: SFT
+sft:
+  data: data/sft_chatml.jsonl  # 25,687 ChatML пар
+  max_steps: 2000
+  lr: 5e-6
+  estimated_time: 2-3 hours
+
+# Phase 3: DPO
+dpo:
+  data: data/dpo_dataset.jsonl  # 4500 пар
+  epochs: 1
+  lr: 1e-6
+  estimated_time: 5-10 min

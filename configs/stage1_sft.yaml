@@ -1,0 +1,79 @@
+# Stage 1: Instruction Following (после Stage 0 pretrain)
+# Цель: научить модель отвечать на вопросы по инструкции
+# Архитектура: та же 1B модель
+# Данные: SFT пары prompt→response
+
+model:
+  vocab_size: 32000
+  d_model: 2048
+  n_heads: 32
+  n_layers: 20
+  max_seq_len: 1024
+  dropout: 0.05
+  mlp_hidden_mult: 4
+  rope: true
+  rope_base: 10000.0
+  tie_weights: true
+  bias: false
+
+# SFT данные
+data:
+  sft_jsonl: data/sft_stage1/sft_raw.jsonl
+  format: "prompt_response"  # {prompt, response}
+
+# Обучение
+training:
+  warm_start_from: checkpoints/v0_1b_1000/best.pt  # или v1_fineweb/best.pt
+  max_steps: 3000
+  lr: 5e-5                     # очень маленький lr (не сломать pretrain)
+  warmup_steps: 50
+  batch_size: 1
+  seq_len: 1024
+  grad_accum: 4                # меньший effective batch
+  weight_decay: 0.01
+  grad_clip: 1.0
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_eps: 1.0e-8
+
+# Checkpointing
+checkpointing:
+  output_dir: checkpoints/stage1_sft
+  save_interval: 300
+  eval_interval: 100
+  keep_best_n: 3
+
+# Eval
+eval:
+  eval_data: data/binary/v0/wiki_summaries_full.bin
+  eval_chunks: 50
+  eval_seq_len: 512
+
+# Template (chat format)
+template:
+  user_prefix: "User: "
+  assistant_prefix: "Assistant: "
+  eos_token: "\n\n"
+
+# Notes
+notes:
+  goal: |
+    Stage 1 — научить модель instruction following.
+    После Stage 0 pretrain модель знает язык, но не умеет отвечать на вопросы.
+    SFT на 79K пар даст базовое понимание инструкций.
+
+  expected_improvements:
+    - Модель начнёт отвечать на вопросы (vs просто продолжать текст)
+    - Лучше следует формату
+    - Может использоваться в Bridge Bot
+
+  risks:
+    - Catastrophic forgetting (потеряет часть pretrain знаний)
+    - Маленький dataset для 1B модели
+    - 1 шаг на пару = очень медленно
+
+  pipeline:
+    step_1: "Закончить v0_1b_1000 (Stage 0)"
+    step_2: "Запустить v1_fineweb (Stage 0.5 — больше данных)"
+    step_3: "Запустить stage1_sft (этот config)"
+    step_4: "Оценить качество через Bridge Bot"

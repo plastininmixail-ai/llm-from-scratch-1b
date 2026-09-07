@@ -1,0 +1,33 @@
+model:
+  d_model: 1024          # 1.33x xlarge
+  n_heads: 16            # 1024 / 16 = 64 per head
+  n_layers: 24           # 1.5x xlarge
+  max_seq_len: 256
+  dropout: 0.0
+  bias: false
+
+training:
+  batch_size: 1
+  seq_len: 256
+  lr: 2e-4               # higher LR for new larger model
+  warmup: 500
+  weight_decay: 0.1
+  grad_clip: 1.0
+
+tokenizer:
+  vocab_size: 1500
+
+data:
+  corpus: data/raw/chat_xlarge_corpus.txt
+
+# Architecture estimate:
+# Embedding: 1500 × 1024 = 1.5M
+# Per block (12M):
+#   - 4 × d_model² = 4 × 1024² = 4M (Q, K, V, O)
+#   - FFN: d_model × d_ff × 2 = 1024 × 4096 × 2 = 8.4M
+# 24 blocks: 24 × 12.4M = 297M
+# + LN, head: ~1M
+# Total: ~300M (close to 500M target)
+#
+# For ~500M need n_layers=32 OR d_model=1280
+# Use d_model=1024, n_layers=32 → ~395M

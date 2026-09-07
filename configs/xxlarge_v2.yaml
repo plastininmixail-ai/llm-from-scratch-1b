@@ -1,0 +1,23 @@
+# xxlarge_v2 — 200M модель (компромисс между качеством и скоростью)
+
+model:
+  d_model: 1024
+  n_heads: 16
+  n_layers: 16
+  max_seq_len: 512
+  dropout: 0.0
+  bias: false
+  rope_enabled: true
+  rope_base: 10000.0
+  tie_weights: true
+
+training:
+  batch_size: 1
+  seq_len: 512
+  lr: 2e-4
+  warmup: 500
+  weight_decay: 0.1
+  grad_clip: 1.0
+
+tokenizer:
+  vocab_size: 3000

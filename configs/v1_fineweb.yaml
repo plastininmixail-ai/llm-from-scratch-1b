@@ -1,0 +1,71 @@
+# v1 config — следующее обучение после v0_1b_1000
+# Основа: FineWeb-Edu (9.6M docs, ~45GB text → ~10B токенов)
+# Цель: улучшить quality через больше данных + warm-start от v0_1b_1000
+
+model:
+  vocab_size: 32000
+  d_model: 2048
+  n_heads: 32
+  n_layers: 20
+  max_seq_len: 1024
+  dropout: 0.1
+  mlp_hidden_mult: 4
+  rope: true
+  rope_base: 10000.0
+  tie_weights: true
+  bias: false
+
+# Данные
+data:
+  binary_dir: data/binary/v1_fineweb
+  manifest: data/binary/v1_fineweb/manifest.json
+
+# Обучение
+training:
+  warm_start_from: checkpoints/v0_1b_1000/best.pt  # стартуем с лучшего чекпойнта v0
+  max_steps: 5000               # 5x больше чем v0 (1000)
+  lr: 1.5e-4                    # меньше lr (warm-start), 0.5x от v0
+  warmup_steps: 200             # короче warmup (warm-start)
+  batch_size: 1
+  seq_len: 1024
+  grad_accum: 8                 # effective batch = 8
+  weight_decay: 0.1
+  grad_clip: 1.0
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_eps: 1.0e-8
+
+# Checkpointing
+checkpointing:
+  output_dir: checkpoints/v1_fineweb
+  save_interval: 500            # 10 чекпойнтов на 5000 шагов
+  eval_interval: 200            # eval каждые 200 шагов
+  keep_best_n: 3                # оставлять 3 лучших
+
+# Eval
+eval:
+  eval_data: data/binary/v0/wiki_summaries_full.bin
+  eval_chunks: 50
+  eval_seq_len: 512
+
+# Logging
+logging:
+  log_interval: 20
+  log_dir: logs/v1_fineweb
+
+# Notes / Plan
+notes:
+  goal: |
+    Stage 0 — улучшение через качественные данные.
+    FineWeb-Edu — отфильтрованный educational web-text.
+    Warm-start от v0_1b_1000 сохраняет знания и ускоряет сходимость.
+
+  expected_improvements:
+    - Лучше генерация EN (больше качественных данных)
+    - Возможно лучше понимание структуры текста
+    - Perplexity должна упасть с ~5.2 до <4.5
+
+  risks:
+    - FineWeb-Edu EN-only, может ухудшить RU
+    - 5000 шагов × ~140s = ~8 дней на CPU
+    - Диск: ~30GB на чекпойнты (10 × 4GB)

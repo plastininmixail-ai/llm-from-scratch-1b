@@ -1,0 +1,21 @@
+model:
+  d_model: 768          # размерность embeddings
+  n_heads: 12           # число голов внимания (должно делить d_model)
+  n_layers: 16          # число блоков трансформера
+  max_seq_len: 256      # контекстное окно
+  dropout: 0.0
+  bias: false
+
+training:
+  batch_size: 1
+  seq_len: 256
+  lr: 3e-4
+  warmup: 200
+  weight_decay: 0.1
+  grad_clip: 1.0
+
+tokenizer:
+  vocab_size: 1500
+
+data:
+  corpus: data/raw/chat_xlarge_corpus.txt
