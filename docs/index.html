@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>LLM Training Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: monospace; max-width: 1200px; margin: 0 auto; padding: 20px; background: #0d1117; color: #c9d1d9; }
+  h1, h2 { color: #58a6ff; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
+  .stat { background: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d; }
+  .stat-value { font-size: 2em; font-weight: bold; color: #f0883e; }
+  .stat-label { color: #8b949e; font-size: 0.9em; }
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+  th, td { padding: 8px; text-align: left; border-bottom: 1px solid #30363d; }
+  th { background: #161b22; color: #58a6ff; }
+  .sample { background: #161b22; padding: 10px; margin: 5px 0; border-left: 3px solid #58a6ff; font-size: 0.9em; }
+  .footer { margin-top: 40px; color: #8b949e; text-align: center; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<h1>🚀 LLM Training Dashboard</h1>
+<p>1B parameter model, trained on FineWeb-Edu, custom framework</p>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label">Current Step</div>
+    <div class="stat-value">91</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Current Loss</div>
+    <div class="stat-value">4.5557</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Latest Checkpoint</div>
+    <div class="stat-value" style="font-size: 1em;">N/A</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Last Updated</div>
+    <div class="stat-value" style="font-size: 1em;">2026-09-07 21:02</div>
+  </div>
+</div>
+
+<h2>📉 Training Loss</h2>
+<canvas id="lossChart" width="400" height="150"></canvas>
+<script>
+const ctx = document.getElementById('lossChart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: Array.from({length: 92}, (_, i) => i),
+    datasets: [{
+      label: 'Train Loss',
+      data: [[0,6.732733845710754],[1,6.678151786327362],[2,6.704271376132965],[3,6.552135169506073],[4,6.636104166507721],[5,6.71008974313736],[6,6.50174880027771],[7,6.5054596066474915],[8,6.457593202590942],[9,6.39599335193634],[10,6.392236649990082],[11,6.330666780471802],[12,6.31462687253952],[13,6.221212863922119],[14,6.162946045398712],[15,6.113959074020386],[16,6.081217467784882],[17,6.066194176673889],[18,5.953288495540619],[19,5.885327935218811],[20,5.87243515253067],[21,5.881062626838684],[22,5.795298874378204],[23,5.756762802600861],[24,5.723915338516235],[25,5.642169654369354],[26,5.634040713310242],[27,5.628508448600769],[28,5.560467720031738],[29,5.501753926277161],[30,5.562907338142395],[31,5.388300776481628],[32,5.499680697917938],[33,5.392317056655884],[34,5.378626465797424],[35,5.290384292602539],[36,5.292654097080231],[37,5.289496123790741],[38,5.318832278251648],[39,5.250584185123444],[40,5.278933584690094],[41,5.291296601295471],[42,5.212050199508667],[43,5.145573258399963],[44,5.130431234836578],[45,5.156681835651398],[46,5.1567941308021545],[47,5.079284310340881],[48,5.1090922355651855],[49,5.059673249721527],[50,5.06136029958725],[51,5.0651785135269165],[52,5.164117097854614],[53,5.146831572055817],[54,4.9976197481155396],[55,5.01805317401886],[56,5.019354403018951],[57,4.996106266975403],[58,4.894633114337921],[59,4.926316559314728],[60,4.879925847053528],[61,4.931357383728027],[62,4.898006558418274],[63,4.887049376964569],[64,4.874313056468964],[65,4.8777658343315125],[66,4.876361966133118],[67,4.912478089332581],[68,4.8219975233078],[69,4.904320597648621],[70,4.753580331802368],[71,4.768085300922394],[72,4.861326694488525],[73,4.773631930351257],[74,4.716933727264404],[75,4.799919605255127],[76,4.684032440185547],[77,4.786201357841492],[78,4.699089527130127],[79,4.729578673839569],[80,4.704763233661652],[81,4.636481702327728],[82,4.6420289278030396],[83,4.5825905203819275],[84,4.558059394359589],[85,4.588372111320496],[86,4.724569261074066],[87,4.581533193588257],[88,4.528071165084839],[89,4.78226363658905],[90,4.7927215695381165],[91,4.555654048919678]],
+      borderColor: '#f0883e',
+      backgroundColor: 'rgba(240, 136, 62, 0.1)',
+      fill: true,
+      tension: 0.3,
+    }]
+  },
+  options: {
+    plugins: { legend: { labels: { color: '#c9d1d9' } } },
+    scales: {
+      x: { ticks: { color: '#8b949e' }, grid: { color: '#30363d' } },
+      y: { ticks: { color: '#8b949e' }, grid: { color: '#30363d' } }
+    }
+  }
+});
+</script>
+
+<h2>📊 Perplexity on Different Datasets</h2>
+<table>
+  <tr><th>Dataset</th><th>PPL</th></tr>
+</table>
+<h2>🎯 Latest Generations</h2>
+<div class="sample"><b>Python is a programming language</b><br><|im_end|im_end|>user</w>
+SSÐÑÐ°Ð²Ð»Ð½Ð¸</w> Ð½Ð¾</w> ÑÐ¼</w> 
+</div>
+<div class="sample"><b>The meaning of life is</b><br>_end|></w><|im_end|im_end|></w><|></w><|>assistant</w>
+<|im_end</div>
+<div class="sample"><b>In the beginning</b><br>ey.crattflydlim_start|im_start|im_start|im_st</div>
+<div class="sample"><b>Science is</b><br>.<|im_end|im_start|im_start|></w>
+Ð Ð°ÑÑÐºÐ°Ð¶</w>
+<|im_</div>
+<div class="sample"><b>The history of</b><br>tlsche</w>
+<|>assistant</w>
+Ð
+<|im_start|>user</w>
+<|im</div>
+
+<div class="footer">
+  <p>LLM-from-scratch-1b · Generated by training_report.py · Auto-updated by GitHub Actions</p>
+</div>
+</body>
+</html>
