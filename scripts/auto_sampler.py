@@ -21,14 +21,59 @@ LOG.parent.mkdir(parents=True, exist_ok=True)
 
 # Разнообразные тестовые промпты
 PROMPTS = [
+    # Knowledge
     "The capital of France is",
+    "The capital of Japan is",
+    "The capital of Russia is",
+    "The capital of Germany is",
+    "The capital of Brazil is",
+    "Mount Everest is located in",
+    "The Sun is a",
+    "Water boils at",
+    "Earth orbits around",
+    "The human body has",
+
+    # Reasoning
     "Machine learning is",
-    "Once upon a time",
+    "Artificial intelligence means",
+    "Neural networks are",
+    "Deep learning differs from",
+    "Reinforcement learning uses",
+
+    # Math
+    "Two plus two equals",
+    "Five times three is",
+    "Ten divided by two is",
+    "The square of four is",
+    "A triangle has",
+
+    # Code
     "Python is a programming language",
+    "JavaScript runs in",
+    "Git is used for",
+    "SQL is used to",
+    "HTML stands for",
+
+    # Creative
+    "Once upon a time",
+    "In a galaxy far away",
+    "The old wizard opened",
+    "She walked into the room and saw",
+    "The secret to happiness is",
+
+    # Philosophy
     "The meaning of life is",
-    "In the beginning",
+    "Knowledge is power because",
+    "Wisdom differs from",
+    "Happiness comes from",
+    "Truth is",
+
+    # Russian (через ASCII)
     "Science is",
     "The history of",
+    "Music is",
+    "Books are",
+    "Friendship means",
 ]
 
 

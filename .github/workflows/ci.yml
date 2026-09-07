@@ -1,0 +1,129 @@
+name: CI Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install pyyaml requests python-dotenv pynacl huggingface_hub
+
+      - name: Test imports
+        run: |
+          python -c "from framework.model import GPT, ModelConfig, count_params; print(f'Params: {count_params(ModelConfig()):,}')"
+          python -c "from framework.training import Trainer, TrainerConfig"
+          python -c "from framework.inference import generate, load_model_for_inference"
+          python -c "from framework.evaluation import compute_perplexity"
+          python -c "from framework.data import BinaryDataset, tokenize_jsonl"
+
+      - name: Test BPE tokenizer
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          from framework.data.simple_tokenizer import SimpleBPETokenizer
+          tok = SimpleBPETokenizer('tokenizer/vocab_3k.json')
+          print(f'Vocab size: {len(tok.vocab)}')
+          ids = tok.encode('Hello world')
+          assert len(ids) > 0, 'Empty encoding'
+          print(f'Encoded: {ids}')
+          "
+
+      - name: Test agents
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          from agents.common import ProjectSpec
+          from agents.architect import ArchitectAgent
+          from agents.data_engineer import DataEngineerAgent
+          from agents.trainer import TrainerAgent
+          from agents.orchestrator import Orchestrator
+          from agents.curator import CuratorAgent
+          print('All agents imported')
+          "
+
+      - name: Test model forward pass
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          import torch
+          from framework.model import GPT, ModelConfig
+
+          cfg = ModelConfig(
+              vocab_size=1000,
+              d_model=128,
+              n_heads=4,
+              n_layers=2,
+              max_seq_len=64,
+          )
+          model = GPT(cfg)
+          x = torch.randint(0, 1000, (1, 16))
+          logits, _ = model(x)
+          assert logits.shape == (1, 16, 1000), f'Wrong shape: {logits.shape}'
+          print(f'Forward pass OK: {logits.shape}')
+          "
+
+      - name: Test generation
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          import torch
+          from framework.model import GPT, ModelConfig
+          from framework.inference import generate
+
+          cfg = ModelConfig(
+              vocab_size=1000,
+              d_model=128,
+              n_heads=4,
+              n_layers=2,
+              max_seq_len=64,
+          )
+          model = GPT(cfg)
+          x = torch.tensor([[1, 2, 3]], dtype=torch.long)
+          out = generate(model, x, max_new_tokens=5)
+          assert out.shape == (1, 8), f'Wrong shape: {out.shape}'
+          print(f'Generation OK: {out.shape}')
+          "
+
+      - name: Test evaluator
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          import torch
+          from framework.model import GPT, ModelConfig
+          from framework.evaluation import compute_perplexity
+
+          cfg = ModelConfig(
+              vocab_size=1000,
+              d_model=128,
+              n_heads=4,
+              n_layers=2,
+              max_seq_len=64,
+          )
+          model = GPT(cfg)
+          tokens = torch.randint(0, 1000, (200,))
+          ppl = compute_perplexity(model, tokens, seq_len=64)
+          assert ppl > 0, f'Bad PPL: {ppl}'
+          print(f'Perplexity OK: {ppl:.2f}')
+          "
