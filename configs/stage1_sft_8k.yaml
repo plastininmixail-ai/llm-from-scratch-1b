@@ -1,0 +1,76 @@
+# Stage 1: Instruction Following with vocab 8K
+# Используем новый BPE vocab 8K (обучен на 150MB корпуса)
+# Архитектура: 1B модель с расширенным vocab
+
+model:
+  vocab_size: 8000            # НОВЫЙ vocab 8K (вместо 32K)
+  d_model: 2048
+  n_heads: 32
+  n_layers: 20
+  max_seq_len: 1024
+  dropout: 0.05
+  mlp_hidden_mult: 4
+  rope: true
+  rope_base: 10000.0
+  tie_weights: true
+  bias: false
+
+# SFT данные
+data:
+  sft_jsonl: data/sft_stage1/sft_with_math.jsonl
+  format: "prompt_response"
+  tokenizer: "tokenizer/vocab_8k.json"
+
+# Обучение (warm-start от v1_fineweb когда будет готов)
+training:
+  warm_start_from: checkpoints/v1_fineweb/best.pt
+  max_steps: 3000
+  lr: 5e-5
+  warmup_steps: 100
+  batch_size: 1
+  seq_len: 1024
+  grad_accum: 4
+  weight_decay: 0.01
+  grad_clip: 1.0
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_eps: 1.0e-8
+
+# Checkpointing
+checkpointing:
+  output_dir: checkpoints/stage1_sft_8k
+  save_interval: 200
+  eval_interval: 100
+  keep_best_n: 3
+
+# Eval
+eval:
+  eval_data: data/binary/v0/wiki_summaries_full.bin
+  eval_chunks: 50
+  eval_seq_len: 512
+
+# Template (chat format)
+template:
+  user_prefix: "User: "
+  assistant_prefix: "Assistant: "
+  eos_token: "\n\n"
+
+# Notes
+notes:
+  goal: |
+    Stage 1 SFT с vocab 8K.
+    Преимущества vocab 8K:
+    - "transformer" = 4 токена (вместо 11 с vocab 3K)
+    - Лучше покрытие RU слов
+    - Меньше субтокенов = лучше качество
+
+  migration_from_v1:
+    - v1_fineweb обучен с vocab 32K (но фактически 3K токенов в binary файлах)
+    - vocab 8K — НОВЫЙ, embedding нужно переинициализировать
+    - Альтернатива: дообучить с нуля или warm-start с обрезанным embedding
+
+  plan:
+    - step_1: Дождаться окончания v1_fineweb training
+    - step_2: Создать новую модель с vocab 8K (transfer learning для embedding)
+    - step_3: SFT на 89K пар с vocab 8K
+    - step_4: Eval на GSM8K + generation tests
