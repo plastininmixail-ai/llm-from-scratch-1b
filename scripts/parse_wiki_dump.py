@@ -1,154 +1,127 @@
-"""Парсер Wikipedia dump (XML Multistream).
-
-Извлекает title → первый параграф (summary) для каждой статьи.
-Сохраняет в JSONL для дальнейшей загрузки в TF-IDF KB.
-
-Формат входа: enwiki-latest-pages-articles-multistream.xml.bz2
-~25 GB bz2 → ~95 GB raw XML → ~100 GB extracted text
-Обработка: ~30-60 минут на CPU.
-
-Использование:
-  python -m scripts.parse_wiki_dump
-"""
-from __future__ import annotations
-
-import bz2
-import json
-import re
+"""Парсинг Wiki XML bz2 → jsonl."""
 import sys
-import time
+import bz2
+import re
+import json
 from pathlib import Path
 
-ROOT = Path("C:/Users/mixai/Desktop/llm-from-scratch")
-WIKI_PATH = ROOT / "data/wiki/enwiki-latest-pages-articles-multistream.xml.bz2"
-OUTPUT_PATH = ROOT / "data/wiki_summaries.jsonl"
-
-# Regex для извлечения title
-TITLE_RE = re.compile(r"<title>(.*?)</title>", re.DOTALL)
-# Regex для извлечения text (статья целиком, не только intro)
-TEXT_RE = re.compile(r"<text[^>]*>(.*?)</text>", re.DOTALL)
-# Wikipedia разметка: убираем templates, infoboxes
-INFOBOX_RE = re.compile(r"\{\{[^}]*\}\}", re.DOTALL)
-TEMPLATE_RE = re.compile(r"\{\{[^}]*\}\}", re.DOTALL)
-WIKI_LINK_RE = re.compile(r"\[\[([^|\]]+)(?:\|[^\]]+)?\]\]")
-HTML_TAG_RE = re.compile(r"<[^>]+>")
-REF_RE = re.compile(r"<ref[^>]*>.*?</ref>", re.DOTALL)
-COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+sys.path.insert(0, ".")
 
 
-def clean_text(raw: str) -> str:
-    """Очистка Wikipedia разметки → plain text."""
-    text = raw
+def parse_wiki_dump(bz2_path: Path, out_path: Path, max_articles: int = None):
+    """Парсит Wiki dump в jsonl.
 
-    # Убираем комментарии
-    text = COMMENT_RE.sub("", text)
-    # Убираем HTML tags
-    text = HTML_TAG_RE.sub(" ", text)
-    # Убираем infobox
-    text = INFOBOX_RE.sub("", text)
-    # Убираем ссылки [[X|Y]] → X
-    text = WIKI_LINK_RE.sub(r"\1", text)
-    # Убираем refs
-    text = REF_RE.sub("", text)
-    # Схлопываем whitespace
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
+    Формат MediaWiki XML:
+    <page>
+      <title>...</title>
+      <id>...</id>
+      <revision>
+        <text>...длинная статья...</text>
+      </revision>
+    </page>
+    """
+    print(f"Parsing {bz2_path.name}...")
+    print(f"  size: {bz2_path.stat().st_size/1e9:.2f} GB")
 
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    count = 0
+    text_count = 0
 
-def extract_summary(text: str, max_len: int = 500) -> str:
-    """Извлечь первый параграф (summary)."""
-    # Берём первое предложение (до точки)
-    text = clean_text(text)
-    # Берём первые N chars или до первой точки + пробел
-    sentences = re.split(r"\. (?=[A-ZА-Я])", text)
-    summary = ""
-    for s in sentences[:3]:
-        if len(summary) + len(s) > max_len:
-            break
-        summary += s + ". "
-    return summary.strip()[:max_len]
+    # Regex для извлечения страниц
+    page_pattern = re.compile(
+        rb"<page>(.*?)</page>", re.DOTALL
+    )
+    title_pattern = re.compile(rb"<title>(.*?)</title>", re.DOTALL)
+    text_pattern = re.compile(rb"<text[^>]*>(.*?)</text>", re.DOTALL)
 
+    with bz2.open(bz2_path, "rb") as f, out_path.open("w", encoding="utf-8") as out:
+        # Читаем блоками (XML большой)
+        buffer = b""
+        chunk_size = 10 * 1024 * 1024  # 10 MB
 
-def should_skip_title(title: str) -> bool:
-    """Пропускаем служебные статьи."""
-    if title.startswith(("Wikipedia:", "Help:", "Category:", "File:", "Template:", "Portal:", "Special:", "User:", "Talk:")):
-        return True
-    if ":" in title and not title.startswith(("List of",)):
-        return True
-    if title.startswith("List of"):
-        return False  # Lists интересны
-    return False
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
 
+            buffer += chunk
 
-def parse_dump() -> int:
-    """Парсит Wikipedia dump и сохраняет в JSONL."""
-    if not WIKI_PATH.exists():
-        print(f"ERROR: {WIKI_PATH} не найден")
-        return 1
+            # Находим все page в buffer
+            pages = page_pattern.findall(buffer)
 
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+            # Оставляем только последний неполный page в buffer
+            last_page_end = buffer.rfind(b"</page>")
+            if last_page_end != -1:
+                buffer = buffer[last_page_end + len(b"</page>"):]
+            else:
+                buffer = b""
 
-    print(f"📖 Парсю {WIKI_PATH.name}")
-    print(f"   Размер: {WIKI_PATH.stat().st_size / 1e9:.2f} GB")
+            for page in pages:
+                if max_articles and count >= max_articles:
+                    print(f"  Reached max_articles={max_articles}")
+                    return count
 
-    n_processed = 0
-    n_skipped = 0
-    n_saved = 0
-    t0 = time.time()
-    last_log = t0
+                title_match = title_pattern.search(page)
+                text_match = text_pattern.search(page)
 
-    with bz2.open(WIKI_PATH, "rt", encoding="utf-8") as f, \
-         OUTPUT_PATH.open("w", encoding="utf-8") as out:
-
-        # Идём постранично (XML Wikipedia Multistream использует <page> теги)
-        buffer = ""
-        for line in f:
-            buffer += line
-
-            # Конец страницы
-            if "</page>" in buffer:
-                # Извлекаем title
-                title_match = TITLE_RE.search(buffer)
-                if not title_match:
-                    buffer = ""
+                if not title_match or not text_match:
+                    count += 1
                     continue
 
-                title = title_match.group(1).strip()
-                n_processed += 1
+                title = title_match.group(1).decode("utf-8", errors="ignore").strip()
+                text = text_match.group(1).decode("utf-8", errors="ignore").strip()
 
-                if should_skip_title(title):
-                    n_skipped += 1
-                else:
-                    # Извлекаем text
-                    text_match = TEXT_RE.search(buffer)
-                    if text_match:
-                        raw_text = text_match.group(1)
-                        summary = extract_summary(raw_text)
-                        if summary and len(summary) > 50:
-                            out.write(json.dumps({
-                                "title": title,
-                                "summary": summary,
-                                "lang": "en",
-                            }, ensure_ascii=False) + "\n")
-                            n_saved += 1
+                # Пропускаем короткие
+                if len(text) < 200:
+                    count += 1
+                    continue
 
-                buffer = ""
+                # Убираем Wiki markup (минимально)
+                text = re.sub(r"\[\[[^|\]]*\|", "", text)  # [[link|text]] → text
+                text = re.sub(r"\[\[", "", text)  # [[link]] → link
+                text = re.sub(r"\{\{[^}]*\}\}", "", text)  # {{template}}
+                text = re.sub(r"<ref[^>]*>.*?</ref>", "", text, flags=re.DOTALL)
+                text = re.sub(r"<[^>]+>", "", text)
+                text = re.sub(r"'''(.+?)'''", r"\1", text)  # bold
+                text = re.sub(r"''(.+?)''", r"\1", text)  # italic
+                text = re.sub(r"==+ *(.+?) *==+", r"\1", text)  # headers
+                text = re.sub(r"\s+", " ", text).strip()
 
-                # Логируем каждые 30 сек
-                if time.time() - last_log > 30:
-                    elapsed = time.time() - t0
-                    rate = n_processed / elapsed if elapsed > 0 else 0
-                    print(f"  [{elapsed/60:.1f}min] processed={n_processed}, saved={n_saved}, skipped={n_skipped}, rate={rate:.0f}/s")
-                    last_log = time.time()
+                if len(text) < 200:
+                    count += 1
+                    continue
 
-    elapsed = time.time() - t0
-    print(f"\n✅ Готово за {elapsed/60:.1f} мин")
-    print(f"   Processed: {n_processed}")
-    print(f"   Saved: {n_saved}")
-    print(f"   Skipped: {n_skipped}")
-    print(f"   Output: {OUTPUT_PATH}")
-    return 0
+                out.write(json.dumps({
+                    "title": title,
+                    "text": text,
+                }, ensure_ascii=False) + "\n")
+
+                count += 1
+                text_count += 1
+
+                if count % 10000 == 0:
+                    print(f"  {count} pages, {text_count} with text")
+
+    print(f"\nDone: {count} pages, {text_count} with text")
+    print(f"Output: {out_path}")
+    return text_count
+
+
+def main():
+    import argparse
+
+    p = argparse.ArgumentParser()
+    p.add_argument("--input", required=True, help="Path to .xml.bz2 file")
+    p.add_argument("--output", required=True, help="Output .jsonl file")
+    p.add_argument("--max-articles", type=int, default=None)
+    args = p.parse_args()
+
+    parse_wiki_dump(
+        Path(args.input),
+        Path(args.output),
+        args.max_articles,
+    )
 
 
 if __name__ == "__main__":
-    raise SystemExit(parse_dump())
+    main()
