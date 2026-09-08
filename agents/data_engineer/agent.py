@@ -26,13 +26,48 @@ class DataEngineerAgent(BaseAgent):
 
         # Список уже доступных данных
         available = []
+        # Поиск файлов по разным путям (sources/, raw/, корневая)
+        source_paths = {
+            "wiki_summaries_full": ["data/wiki_summaries_full.jsonl"],
+            "openstax_textbooks": ["data/openstax_textbooks.jsonl"],
+            "openstax_pdfs": ["data/sources/openstax_pdfs/*.pdf", "data/sources/openstax_pdfs/*.json"],
+            "fineweb_edu": ["data/sources/fineweb_edu/**/*.parquet"],
+            "fastai": ["data/sources/fastai/**/*.txt", "data/sources/fastai/**/*.md"],
+            "wiki_summaries": ["data/wiki_summaries.jsonl"],
+            "sft_combined": ["data/sft_combined.jsonl"],
+            "sft_v2": ["data/sft_v2.jsonl"],
+            "sft_fastai": ["data/sft_fastai.jsonl"],
+            "sft_sources_combined": ["data/sft_sources_combined.jsonl"],
+            "chat_v23": ["data/chat_v23.jsonl"],
+            "wiki_ru": ["data/sources/wiki_ru/*.jsonl"],
+            "wiki_multi": ["data/sources/wiki_multi/*.jsonl"],
+            "github_code": ["data/sources/github_code/*.txt"],
+            "sep": ["data/sources/sep/*.html"],
+            "iep": ["data/sources/iep/*.html"],
+            "arxiv": ["data/sources/arxiv/*"],
+        }
+
         for source in sources:
-            src_path = Path(f"data/{source}.jsonl")
-            if src_path.exists():
-                size = src_path.stat().st_size
-                available.append({"name": source, "path": str(src_path), "size_bytes": size})
-                self.log(f"  ✓ Found {source}: {size/1024**2:.1f} MB")
-            else:
+            found = False
+            patterns = source_paths.get(source, [f"data/{source}.jsonl", f"data/{source}/*.jsonl"])
+
+            from glob import glob
+            for pattern in patterns:
+                matches = glob(pattern, recursive=True)
+                if matches:
+                    total_size = sum(Path(m).stat().st_size for m in matches if Path(m).is_file())
+                    if total_size > 0:
+                        available.append({
+                            "name": source,
+                            "files": len(matches),
+                            "size_bytes": total_size,
+                            "size_mb": round(total_size/1024**2, 1),
+                        })
+                        self.log(f"  ✓ Found {source}: {len(matches)} files, {total_size/1024**2:.1f} MB")
+                        found = True
+                        break
+
+            if not found:
                 self.log(f"  ✗ Missing {source}")
 
         # Tokenize (TODO: подключить BPE)
