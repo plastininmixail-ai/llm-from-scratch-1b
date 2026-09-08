@@ -16,6 +16,7 @@ ENV/
 data/raw/
 data/tokens/
 checkpoints/
+checkpoints_backup/
 logs/
 *.pt
 *.pth
